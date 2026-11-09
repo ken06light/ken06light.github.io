@@ -47,9 +47,9 @@ body.playing .prompt rt{font-size:.52em;font-weight:600;letter-spacing:0;color:i
 <div class="cover"><img src="assets/taiwan-map.jpg" alt="台湾の地図と名所のイラスト"><div class="cover-tag">YOUR TAIWAN JOURNEY<span>七つの場所をめぐる旅</span></div></div>
 </section>
 <section class="game-wrap"><div class="game-card" id="gameCard">
-<div class="start-screen" id="startScreen"><div class="start-symbol">✳</div><h2>旅の準備はできた？</h2><p>7つのスポットがあるエリアを当てよう。正解すると、そのスポットの写真と豆知識が見られるよ。</p><button class="primary" id="startButton">旅をはじめる　→</button></div>
+<div class="start-screen" id="startScreen"><div class="start-symbol">✳</div><h2>旅の準備はできた？</h2><p>7つのスポットがあるエリアを当てよう。このブラウザーでは1回だけ回答できます。</p><button class="primary" id="startButton">旅をはじめる　→</button></div>
 <div id="quizScreen" class="hidden"><div class="game-head"><span class="game-label">SPOT QUIZ</span><span class="score-label">正解 <b id="score">0</b></span></div><div class="progress"><div class="progress-fill" id="progressFill"></div></div><div class="game-body"><div class="question-row"><span class="q-number" id="qNumber">QUESTION 01 / 07</span><div class="q-dots" id="qDots" aria-label="進行状況"></div></div><h2 class="prompt" id="prompt"></h2><p class="hint">このスポットはどのエリア？　ひとつ選んでね。</p><div class="options" id="options"></div><div class="feedback" id="feedback" aria-live="polite"><img id="feedbackImage" src="" alt=""><div><p class="feedback-title" id="feedbackTitle"></p><p class="feedback-text" id="feedbackText"></p><div class="feedback-link" id="feedbackName"></div></div></div><div class="actions"><button class="primary hidden" id="nextButton">次のスポットへ　→</button></div></div></div>
-<div class="result-screen hidden" id="resultScreen"><div class="result-stamp">JOURNEY COMPLETE</div><div class="result-score" id="finalScore">0<small> / 7</small></div><h2 id="resultTitle"></h2><p id="resultText"></p><button class="primary" id="replayButton">もう一度遊ぶ　↻</button></div>
+<div class="result-screen hidden" id="resultScreen"><div class="result-stamp">JOURNEY COMPLETE</div><div class="result-score" id="finalScore">0<small> / 7</small></div><h2 id="resultTitle"></h2><p id="resultText"></p><p>このブラウザーでの回答は完了しました。</p></div>
 </div><section class="reveal-screen hidden" id="revealScreen" aria-live="polite"><div class="scene-head"><span id="sceneCounter">QUESTION 01 / 07</span><span class="scene-score" id="sceneScore">正解 0</span></div><div class="scene-content"><span class="scene-kicker" id="sceneKicker">SPOT REVEALED</span><h2 id="sceneTitle"></h2><p id="sceneText"></p><div class="scene-result"><span class="mark" id="sceneBadge"></span><span id="scenePlace"></span></div><button class="primary" id="revealNext">次のスポットへ　→</button></div></section></section>
 </main>
 <footer class="shell footer"><span>台湾の七つのスポットをめぐる旅</span><span>TAIWAN · FORMOSA</span></footer>
@@ -65,11 +65,88 @@ const places=[
 ];
 const areas=[{key:'A',name:'北'},{key:'B',name:'中'},{key:'C',name:'東'},{key:'D',name:'南'}];let index=0,score=0,locked=false;
 const $=id=>document.getElementById(id);
-function begin(){index=0;score=0;document.body.classList.remove('revealing');$('revealScreen').classList.add('hidden');$('score').textContent='0';$('startScreen').classList.add('hidden');$('resultScreen').classList.add('hidden');$('quizScreen').classList.remove('hidden');render()}
+const attemptKey = 'taiwan-quiz:answers:v1';
+
+function readAnswers() {
+  const saved = localStorage.getItem(attemptKey);
+  if (saved === null) return [];
+  const answers = JSON.parse(saved);
+  if (!Array.isArray(answers) || answers.length > places.length ||
+      !answers.every(value => areas.some(area => area.name === value))) {
+    throw new Error('Invalid saved answers');
+  }
+  return answers;
+}
+
+function resumeAttempt(answers) {
+  index = answers.length;
+  score = answers.filter((value, i) => value === places[i].area).length;
+  document.body.classList.remove('revealing');
+  $('revealScreen').classList.add('hidden');
+  $('startScreen').classList.add('hidden');
+  $('score').textContent = score;
+  if (index === places.length) {
+    finish();
+    return;
+  }
+  $('quizScreen').classList.remove('hidden');
+  render();
+}
+
+function showStorageError() {
+  window.alert('回答の記録を保存できません。ブラウザーの保存設定を確認してください。');
+}
+
+function begin() {
+  try {
+    resumeAttempt(readAnswers());
+  } catch {
+    showStorageError();
+  }
+}
+
 function render(){locked=false;const p=places[index];document.body.classList.add('playing');$('quizScreen').style.setProperty('--question-image',`url("assets/${p.image}")`);$('qNumber').textContent=`QUESTION ${String(index+1).padStart(2,'0')} / 07`;$('prompt').innerHTML=p.prompt;$('progressFill').style.width=`${index/7*100}%`;$('feedback').classList.remove('show');$('nextButton').classList.add('hidden');$('qDots').innerHTML=places.map((_,i)=>`<span class="dot ${i<index?'done':''} ${i===index?'current':''}"></span>`).join('');$('options').innerHTML=areas.map(choice=>`<button class="option" data-area="${choice.name}" aria-label="${choice.key})${choice.name}"><span class="letter">${choice.key})${choice.name}</span></button>`).join('');$('options').querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>answer(btn,p)))}
-function answer(btn,p){if(locked)return;locked=true;const correct=btn.dataset.area===p.area;if(correct)score++;$('score').textContent=score;$('sceneCounter').textContent=`QUESTION ${String(index+1).padStart(2,'0')} / 07`;$('sceneScore').textContent=`正解 ${score}`;$('sceneKicker').textContent=`SPOT REVEALED · ${p.area} AREA`;$('sceneTitle').textContent=correct?'正解！':'おしい！';$('sceneText').textContent=p.fact;$('sceneBadge').textContent=correct?'正解':`正解は ${p.area}`;$('scenePlace').textContent=`${p.name} · ${p.area}エリア`;$('revealScreen').style.setProperty('--scene-image',`url("assets/${p.image}")`);$('revealNext').textContent=index===6?'結果を見る　→':'次のスポットへ　→';$('revealScreen').classList.remove('hidden');document.body.classList.add('revealing');$('progressFill').style.width=`${(index+1)/7*100}%`;$('revealNext').focus()}
-function advanceFromReveal(){$('revealScreen').classList.add('hidden');document.body.classList.remove('revealing');if(index>=6){finish();$('gameCard').scrollIntoView({behavior:'smooth',block:'center'});return}index++;render();document.querySelector('.game-wrap').scrollIntoView({behavior:'smooth',block:'center'})}
-function finish(){document.body.classList.remove('playing');$('quizScreen').classList.add('hidden');$('resultScreen').classList.remove('hidden');$('finalScore').innerHTML=`${score}<small> / 7</small>`;let title,text;if(score===7){title='台湾マスター！';text='すばらしい！七つのスポットを全部見つけたね。次の旅先も楽しんで！'}else if(score>=5){title='台湾旅行の達人！';text='よくできました！台湾の魅力をたくさん知っているね。'}else if(score>=3){title='旅の発見がいっぱい！';text='いい調子！気になる場所を写真でもっと見てみよう。'}else{title='旅はこれから！';text='知らないスポットに出会えたね。もう一度チャレンジしてみよう！'}$('resultTitle').textContent=title;$('resultText').textContent=text;$('progressFill').style.width='100%'}
-$('startButton').addEventListener('click',begin);$('revealNext').addEventListener('click',advanceFromReveal);$('replayButton').addEventListener('click',begin);
+async function answer(btn, place) {
+  if (locked) return;
+  locked = true;
+  const questionIndex = index;
+  const selectedArea = btn.dataset.area;
+
+  function saveAnswer() {
+    const answers = readAnswers();
+    if (answers.length !== questionIndex) return {answers, accepted: false};
+    answers.push(selectedArea);
+    localStorage.setItem(attemptKey, JSON.stringify(answers));
+    return {answers, accepted: true};
+  }
+
+  try {
+    const result = navigator.locks
+      ? await navigator.locks.request(attemptKey, saveAnswer)
+      : saveAnswer();
+    if (!result.accepted) {
+      resumeAttempt(result.answers);
+      return;
+    }
+    score = result.answers.filter((value, i) => value === places[i].area).length;
+    revealAnswer(place, selectedArea === place.area);
+  } catch {
+    locked = false;
+    showStorageError();
+  }
+}
+
+function revealAnswer(p, correct) {$('score').textContent=score;$('sceneCounter').textContent=`QUESTION ${String(index+1).padStart(2,'0')} / 07`;$('sceneScore').textContent=`正解 ${score}`;$('sceneKicker').textContent=`SPOT REVEALED · ${p.area} AREA`;$('sceneTitle').textContent=correct?'正解！':'おしい！';$('sceneText').textContent=p.fact;$('sceneBadge').textContent=correct?'正解':`正解は ${p.area}`;$('scenePlace').textContent=`${p.name} · ${p.area}エリア`;$('revealScreen').style.setProperty('--scene-image',`url("assets/${p.image}")`);$('revealNext').textContent=index===6?'結果を見る　→':'次のスポットへ　→';$('revealScreen').classList.remove('hidden');document.body.classList.add('revealing');$('progressFill').style.width=`${(index+1)/7*100}%`;$('revealNext').focus()}
+function advanceFromReveal() {
+  begin();
+  $('gameCard').scrollIntoView({behavior:'smooth', block:'center'});
+}
+function finish(){document.body.classList.remove('playing');$('quizScreen').classList.add('hidden');$('resultScreen').classList.remove('hidden');$('finalScore').innerHTML=`${score}<small> / 7</small>`;let title,text;if(score===7){title='台湾マスター！';text='すばらしい！七つのスポットを全部見つけたね。次の旅先も楽しんで！'}else if(score>=5){title='台湾旅行の達人！';text='よくできました！台湾の魅力をたくさん知っているね。'}else if(score>=3){title='旅の発見がいっぱい！';text='いい調子！気になる場所を写真でもっと見てみよう。'}else{title='旅はこれから！';text='知らないスポットに出会えたね。気になる場所を旅してみよう！'}$('resultTitle').textContent=title;$('resultText').textContent=text;$('progressFill').style.width='100%'}
+$('startButton').addEventListener('click',begin);$('revealNext').addEventListener('click',advanceFromReveal);try {
+  const answers = readAnswers();
+  if (answers.length) resumeAttempt(answers);
+} catch {
+  // Show the storage error if the player tries to start.
+}
 </script>
 </body></html>
